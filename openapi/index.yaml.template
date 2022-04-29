@@ -800,6 +800,10 @@ definitions:
     $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/NewMessage"
   FeatureLevelType:
     $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/FeatureLevelType"
+  PaymentStatus:
+    $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/PaymentStatus"
+  ReadStatus:
+    $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/ReadStatus"
   CIDR:
     $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/CIDR"
   ServicePayload:

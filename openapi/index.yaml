@@ -983,25 +983,16 @@ definitions:
           - REJECTED
         example: ACCEPTED
       read_status:
+        $ref: '#/definitions/ReadStatus'
         description: |-
           Describes whether a user has read the message or not
           NOTE  : This value is only available for ADVANCED messages
           NOTE 2: Without right permissions, `UNAVAILABLE` will be returned
-        type: string
-        x-extensible-enum:
-          - UNAVAILABLE
-          - UNREAD
-          - READ
-        example: UNREAD
       payment_status:
+        $ref: '#/definitions/PaymentStatus'
         description: |-
           Describes the state of the related payment notice
           NOTE: This value is only available for ADVANCED payment messages
-        type: string
-        x-extensible-enum:
-          - PAID
-          - NOT_PAID
-        example: NOT_PAID
     required:
       - message
   EUCovidCert:
@@ -1204,6 +1195,21 @@ definitions:
       - STANDARD
       - ADVANCED
     example: STANDARD
+  PaymentStatus:
+    type: string
+    description: Payment status enumeration
+    x-extensible-enum:
+      - PAID
+      - NOT_PAID
+    example: NOT_PAID
+  ReadStatus:
+    type: string
+    x-extensible-enum:
+      - UNAVAILABLE
+      - UNREAD
+      - READ
+    example: UNREAD
+    description: Api definition of read status enumeration
   CIDR:
     type: string
     description: Describes a single IP or a range of IPs.
