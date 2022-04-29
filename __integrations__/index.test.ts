@@ -36,6 +36,8 @@ import { sequenceS } from "fp-ts/lib/Apply";
 import { createBlobService } from "azure-storage";
 import { EmailString } from "@pagopa/ts-commons/lib/strings";
 import { FeatureLevelTypeEnum } from "@pagopa/io-functions-commons/dist/generated/definitions/FeatureLevelType";
+import { PaymentStatusEnum } from "@pagopa/io-functions-commons/dist/generated/definitions/PaymentStatus";
+import { ReadStatusEnum } from "@pagopa/io-functions-commons/dist/generated/definitions/ReadStatus";
 
 const MAX_ATTEMPT = 50;
 jest.setTimeout(WAIT_MS * MAX_ATTEMPT);
@@ -369,10 +371,14 @@ describe("Create Advanced Message", () => {
         }
       };
 
+      const nodeFetchWithoutPermission = getNodeFetch({
+        "x-subscription-id": serviceId
+      });
       const nodeFetch = getNodeFetch({
         "x-subscription-id": serviceId,
         "x-user-groups":
-          customHeaders["x-user-groups"] + ",ApiMessageWriteAdvanced"
+          customHeaders["x-user-groups"] +
+          ",ApiMessageWriteAdvanced,ApiMessageReadAdvanced"
       });
 
       const result = await postCreateMessage(nodeFetch)(body);
@@ -385,36 +391,46 @@ describe("Create Advanced Message", () => {
       // Wait the process to complete
       await delay(WAIT_MS);
 
+      // Check response having `ApiMessageReadAdvanced` authorization
+
       const resultGet = await getSentMessage(nodeFetch)(fiscalCode, messageId);
 
       expect(resultGet.status).toEqual(200);
       const detail = (await resultGet.json()) as MessageResponseWithContent;
 
-      // TODO Change when getMessage is merged
-      const { feature_level_type, ...exectedMessageResult } = body.message;
       expect(detail).toMatchObject(
         expect.objectContaining({
           message: expect.objectContaining({
             id: messageId,
-            ...exectedMessageResult
+            ...body.message
+          }),
+          status: StatusEnum.PROCESSED,
+          payment_status: PaymentStatusEnum.NOT_PAID,
+          read_status: ReadStatusEnum.UNAVAILABLE
+        })
+      );
+
+      // Check response without `ApiMessageReadAdvanced` authorization
+
+      const resultGetWithoutPermission = await getSentMessage(
+        nodeFetchWithoutPermission
+      )(fiscalCode, messageId);
+
+      expect(resultGetWithoutPermission.status).toEqual(200);
+      const detailWithoutPermission = (await resultGetWithoutPermission.json()) as MessageResponseWithContent;
+
+      expect(detailWithoutPermission).toMatchObject(
+        expect.objectContaining({
+          message: expect.objectContaining({
+            id: messageId,
+            ...body.message
           }),
           status: StatusEnum.PROCESSED
         })
       );
 
-      // TODO Remove when getMessage is merged
-      await pipe(
-        messageModel.find([messageId as NonEmptyString, fiscalCode]),
-        TE.mapLeft(_ => fail(`Error retrieving message data from Cosmos.`)),
-        TE.map(message => {
-          expect(O.isSome(message)).toBeTruthy();
-          if (O.isSome(message)) {
-            expect(message.value.featureLevelType).toEqual(
-              FeatureLevelTypeEnum.ADVANCED
-            );
-          }
-        })
-      )();
+      expect(detailWithoutPermission).not.toHaveProperty("payment_status");
+      expect(detailWithoutPermission).not.toHaveProperty("read_status");
     }
   );
 });
