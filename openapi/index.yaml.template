@@ -848,6 +848,8 @@ definitions:
     $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/PaymentDataBase"
   PaymentData:
     $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/PaymentData"
+  ThirdPartyData:
+    $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/ThirdPartyData"
   Payee:
     $ref: "../node_modules/@pagopa/io-functions-commons/openapi/definitions.yaml#/Payee"
   PaymentDataWithRequiredPayee:

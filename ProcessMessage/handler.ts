@@ -39,6 +39,7 @@ import { EUCovidCert } from "@pagopa/io-functions-commons/dist/generated/definit
 import { initTelemetryClient } from "../utils/appinsights";
 import { toHash } from "../utils/crypto";
 import { PaymentData } from "../generated/definitions/PaymentData";
+import { ThirdPartyData } from "../generated/definitions/ThirdPartyData";
 import { withJsonInput } from "../utils/with-json-input";
 import { withDecodedInput } from "../utils/with-decoded-input";
 import { withExpandedInput, DataFetcher } from "../utils/with-expanded-input";
@@ -113,20 +114,20 @@ const channelToBlockedInboxOrChannelEnum: {
 const servicePreferenceToBlockedInboxOrChannels: (
   servicePreference: ServicePreference
 ) => ReadonlyArray<BlockedInboxOrChannelEnum> = servicePreference =>
-  /**
-   * Reduce the complexity of User's preferences into an array of BlockedInboxOrChannelEnum
-   * In case a preference is set to false, it is translated to proper BlockedInboxOrChannelEnum
-   * and added to returned array.
-   * By adding a `channelToBlockedInboxOrChannelEnum` map we are prepared to handle new
-   * service preferences
-   */
-  Object.entries(servicePreference)
-    // take only attributes of ServicePreferencesValues
-    .filter(([name, _]) => channelToBlockedInboxOrChannelEnum[name])
-    // take values set to false
-    .filter(([_, isEnabled]) => !isEnabled)
-    // map to BlockedInboxOrChannelEnum
-    .map(([name, _]) => channelToBlockedInboxOrChannelEnum[name]);
+    /**
+     * Reduce the complexity of User's preferences into an array of BlockedInboxOrChannelEnum
+     * In case a preference is set to false, it is translated to proper BlockedInboxOrChannelEnum
+     * and added to returned array.
+     * By adding a `channelToBlockedInboxOrChannelEnum` map we are prepared to handle new
+     * service preferences
+     */
+    Object.entries(servicePreference)
+      // take only attributes of ServicePreferencesValues
+      .filter(([name, _]) => channelToBlockedInboxOrChannelEnum[name])
+      // take values set to false
+      .filter(([_, isEnabled]) => !isEnabled)
+      // map to BlockedInboxOrChannelEnum
+      .map(([name, _]) => channelToBlockedInboxOrChannelEnum[name]);
 
 /**
  * Converts a preference to a remapped blockedInboxOrChannels if it exists
@@ -146,49 +147,49 @@ const getServicePreferenceValueOrError = (
   ServicePreferenceError,
   ReadonlyArray<BlockedInboxOrChannelEnum>
 > =>
-  pipe(
-    TE.of<ServicePreferenceError, ServicesPreferencesMode>(
-      userServicePreferencesMode
-    ),
-    TE.chain(
-      TE.fromPredicate(
-        mode => mode !== ServicesPreferencesModeEnum.LEGACY,
-        skippedMode
-      )
-    ),
-    TE.map(_ =>
-      makeServicesPreferencesDocumentId(
-        fiscalCode,
-        serviceId,
-        userServicePreferencesVersion as NonNegativeInteger
-      )
-    ),
-    TE.chainW(documentId =>
-      servicePreferencesModel.find([documentId, fiscalCode])
-    ),
-    TE.chain(maybeServicePref =>
-      pipe(
-        maybeServicePref,
-        O.foldW(
-          () =>
-            // if we do not have a preference we return an empty array only
-            // if we have preference mode AUTO, else we must return an array
-            // with BlockedInboxOrChannelEnum.INBOX
-            userServicePreferencesMode === ServicesPreferencesModeEnum.AUTO
-              ? TE.of([])
-              : userServicePreferencesMode ===
-                ServicesPreferencesModeEnum.MANUAL
-              ? TE.of([BlockedInboxOrChannelEnum.INBOX])
-              : // The following code should never happen
-              // LEGACY is managed above and any other case should be managed explicitly
-              userServicePreferencesMode === ServicesPreferencesModeEnum.LEGACY
-              ? TE.left(skippedMode(userServicePreferencesMode))
-              : TE.left(unexpectedValue(userServicePreferencesMode)),
-          s => TE.of(servicePreferenceToBlockedInboxOrChannels(s))
+    pipe(
+      TE.of<ServicePreferenceError, ServicesPreferencesMode>(
+        userServicePreferencesMode
+      ),
+      TE.chain(
+        TE.fromPredicate(
+          mode => mode !== ServicesPreferencesModeEnum.LEGACY,
+          skippedMode
+        )
+      ),
+      TE.map(_ =>
+        makeServicesPreferencesDocumentId(
+          fiscalCode,
+          serviceId,
+          userServicePreferencesVersion as NonNegativeInteger
+        )
+      ),
+      TE.chainW(documentId =>
+        servicePreferencesModel.find([documentId, fiscalCode])
+      ),
+      TE.chain(maybeServicePref =>
+        pipe(
+          maybeServicePref,
+          O.foldW(
+            () =>
+              // if we do not have a preference we return an empty array only
+              // if we have preference mode AUTO, else we must return an array
+              // with BlockedInboxOrChannelEnum.INBOX
+              userServicePreferencesMode === ServicesPreferencesModeEnum.AUTO
+                ? TE.of([])
+                : userServicePreferencesMode ===
+                  ServicesPreferencesModeEnum.MANUAL
+                  ? TE.of([BlockedInboxOrChannelEnum.INBOX])
+                  : // The following code should never happen
+                  // LEGACY is managed above and any other case should be managed explicitly
+                  userServicePreferencesMode === ServicesPreferencesModeEnum.LEGACY
+                    ? TE.left(skippedMode(userServicePreferencesMode))
+                    : TE.left(unexpectedValue(userServicePreferencesMode)),
+            s => TE.of(servicePreferenceToBlockedInboxOrChannels(s))
+          )
         )
       )
-    )
-  );
+    );
 
 type BlockedInboxesForSpecialService = (params: {
   readonly senderServiceId: NonEmptyString;
@@ -222,46 +223,46 @@ const getBlockedInboxesForSpecialService = (
   logPrefix,
   blockedInboxOrChannel
 }): T.Task<ReadonlyArray<BlockedInboxOrChannelEnum>> =>
-  pipe(
-    lActivation.findLastVersionByModelId([senderServiceId, fiscalCode]),
-    TE.mapLeft(activationError => {
-      // The query has failed, we consider this as a transient error.
-      context.log.error(`${logPrefix}|${activationError.kind}`);
-      throw Error("Error while retrieving user's service Activation");
-    }),
-    TE.map(maybeActivation =>
-      pipe(
-        maybeActivation,
-        O.map(
-          activation =>
-            activation.status === ActivationStatusEnum.ACTIVE ||
-            (activation.status === ActivationStatusEnum.PENDING &&
-              isBefore(
-                subSeconds(new Date(), pendingActivationGracePeriod),
-                // eslint-disable-next-line no-underscore-dangle
-                activation._ts
-              ))
-        ),
-        O.getOrElse(() => false)
-      )
-    ),
-    TE.chainW(
-      TE.fromPredicate(
-        hasActiveActivation => hasActiveActivation,
-        () =>
-          blockedInboxOrChannel.includes(BlockedInboxOrChannelEnum.INBOX)
-            ? blockedInboxOrChannel
-            : [...blockedInboxOrChannel, BlockedInboxOrChannelEnum.INBOX]
-      )
-    ),
-    TE.map(() =>
-      blockedInboxOrChannel.filter(el => el !== BlockedInboxOrChannelEnum.INBOX)
-    ),
-    // Both Left and Right are valid BlockedInboxOrChannelEnum values.
-    // The right side contains the blocked inboxes when exists an `ACTIVE` Activation.
-    // The left side contains the blocked inboxes when the Activation is missing or has status NOT `ACTIVE`
-    TE.toUnion
-  );
+    pipe(
+      lActivation.findLastVersionByModelId([senderServiceId, fiscalCode]),
+      TE.mapLeft(activationError => {
+        // The query has failed, we consider this as a transient error.
+        context.log.error(`${logPrefix}|${activationError.kind}`);
+        throw Error("Error while retrieving user's service Activation");
+      }),
+      TE.map(maybeActivation =>
+        pipe(
+          maybeActivation,
+          O.map(
+            activation =>
+              activation.status === ActivationStatusEnum.ACTIVE ||
+              (activation.status === ActivationStatusEnum.PENDING &&
+                isBefore(
+                  subSeconds(new Date(), pendingActivationGracePeriod),
+                  // eslint-disable-next-line no-underscore-dangle
+                  activation._ts
+                ))
+          ),
+          O.getOrElse(() => false)
+        )
+      ),
+      TE.chainW(
+        TE.fromPredicate(
+          hasActiveActivation => hasActiveActivation,
+          () =>
+            blockedInboxOrChannel.includes(BlockedInboxOrChannelEnum.INBOX)
+              ? blockedInboxOrChannel
+              : [...blockedInboxOrChannel, BlockedInboxOrChannelEnum.INBOX]
+        )
+      ),
+      TE.map(() =>
+        blockedInboxOrChannel.filter(el => el !== BlockedInboxOrChannelEnum.INBOX)
+      ),
+      // Both Left and Right are valid BlockedInboxOrChannelEnum values.
+      // The right side contains the blocked inboxes when exists an `ACTIVE` Activation.
+      // The left side contains the blocked inboxes when the Activation is missing or has status NOT `ACTIVE`
+      TE.toUnion
+    );
 
 /**
  * Creates the message and makes it visible or throw an error
@@ -551,6 +552,9 @@ export const getProcessMessageHandler = ({
               hasPaymentData: PaymentData.is(
                 createdMessageEvent.content.payment_data
               ),
+              hasThirdPartyData: ThirdPartyData.is(
+                createdMessageEvent.content.
+              ),
               messageId: createdMessageEvent.message.id,
               mode: profile.servicePreferencesSettings.mode,
               senderId: createdMessageEvent.message.senderServiceId,
@@ -569,8 +573,8 @@ export const getProcessMessageHandler = ({
               // if profile's timestamp is before email opt out switch limit date we must force isEmailEnabled to false
               isEmailEnabled:
                 isOptInEmailEnabled &&
-                // eslint-disable-next-line no-underscore-dangle
-                isBefore(profile._ts, optOutEmailSwitchDate)
+                  // eslint-disable-next-line no-underscore-dangle
+                  isBefore(profile._ts, optOutEmailSwitchDate)
                   ? false
                   : profile.isEmailEnabled
             }
